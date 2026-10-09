@@ -20,3 +20,4 @@ tmp/
 dev/
 target/
 Cargo.lock
+demo/.run/
