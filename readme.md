@@ -200,3 +200,43 @@ bash ./overtls-install-selfsign.sh
 >   ~~so that you can skip the certificate verification. But this is very dangerous, it is easy to be attacked~~
 >   ~~by [Man-in-the-middle](https://en.wikipedia.org/wiki/Man-in-the-middle_attack),~~
 >   ~~and may steal your password and other sensitive information when you use network accounts.~~
+
+## Tests and demos
+
+The repository ships an end-to-end suite (`tests/`) and a manual walkthrough (`demo/`). Both start
+the real `overtls-bin`, use loopback sockets only and keep their files under `target/test-tmp/` and
+`demo/.run/`.
+
+### End-to-end tests
+
+```bash
+cargo test                        # the inline tests plus every tests/*.rs suite
+cargo test --test e2e_socks5      # a single suite
+cargo test tls_reload_event_tests # the offline subset of the inline tests
+```
+
+- `tests/e2e_*.rs` cover the protocol paths: SOCKS5 TCP and UDP, HTTP proxy mode, the `forward_addr`
+  fallback, `tunnel_path` handling, TLS with `cafile`/`server_domain`/`dangerous_mode`, certificate
+  hot reload, and `panel_sync` (enable/disable and traffic reports).
+- `tests/audit_*.rs` pin the *current* behaviour of the findings listed in `audit-report.md`. Every
+  assertion names the flip a fix requires: fixing a finding has to turn its test red, never delete it.
+- `tests/fixtures/` holds three self-signed test CAs - **test-only material**, see
+  [`tests/fixtures/README.md`](tests/fixtures/README.md).
+- The suites need no network access. The pre-existing inline test `src/config.rs::test_config` still
+  dials a public host, exactly as before.
+- CI runs them on Linux, macOS and Windows (`.github/workflows/check.yml`) plus a dedicated `e2e` job.
+
+### Demo walkthrough
+
+```bash
+cargo build --release
+sh demo/run_all.sh                                        # Linux, macOS, Git Bash
+powershell -ExecutionPolicy Bypass -File demo\run_all.ps1 # Windows: Git Bash + a native scenario
+sh demo/scenarios/02_socks5_udp.sh                        # a single scenario
+```
+
+Nine scenarios start real server/client/target processes and print the expectation next to the
+observation for every step (the labels are Chinese: `预期` / `实际`): SOCKS5 TCP and UDP, HTTP proxy
+mode, the camouflage fallback, TLS verification and hot reload, SSPanel sync, `tunnel_path` and the
+audit suite. `python3` is required for the helpers, `curl` is optional. Prerequisites, per-scenario
+details and the observed behaviour: [`demo/README.md`](demo/README.md).

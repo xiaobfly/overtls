@@ -187,3 +187,39 @@ bash ./overtls-install-selfsign.sh
 >   ~~這樣就可以跳過證書驗證了。但這樣做非常危險，容易遭到~~
 >   ~~[中間人攻擊](https://zh.wikipedia.org/wiki/%E4%B8%AD%E9%97%B4%E4%BA%BA%E6%94%BB%E5%87%BB) ，~~
 >   ~~可能會在你使用網絡帳號時被盜取密碼等敏感信息。請謹慎使用。~~
+
+## 測試與演示
+
+倉庫自帶端到端測試（`tests/`）與人工演練（`demo/`）。兩者都啓動真實的 `overtls-bin`，只使用環回地址，
+文件只寫入 `target/test-tmp/` 與 `demo/.run/`。
+
+### 端到端測試
+
+```bash
+cargo test                        # 內聯測試 + tests/*.rs 全部套件
+cargo test --test e2e_socks5      # 運行單個套件
+cargo test tls_reload_event_tests # 內聯測試中的離線子集
+```
+
+- `tests/e2e_*.rs` 覆蓋協議鏈路：SOCKS5 TCP 與 UDP、HTTP 代理模式、`forward_addr` 回退、
+  `tunnel_path` 處理、帶 `cafile`/`server_domain`/`dangerous_mode` 的 TLS、證書熱重載，
+  以及 `panel_sync`（enable/disable 與流量上報）。
+- `tests/audit_*.rs` 固化 `audit-report.md` 中各發現項的**當前行爲**。每條斷言都註明“修復後需要翻轉成什麼”：
+  修復某項發現應當讓對應用例變紅，而不是刪掉它。
+- `tests/fixtures/` 是三套自籤測試 CA，**僅供測試**，見
+  [`tests/fixtures/README.md`](tests/fixtures/README.md)。
+- 測試不需要外網。既有的內聯測試 `src/config.rs::test_config` 仍會連接公網主機（與以前一致）。
+- CI 在 Linux、macOS、Windows 上運行這些測試（`.github/workflows/check.yml`），另有獨立的 `e2e` job。
+
+### 演示演練
+
+```bash
+cargo build --release
+sh demo/run_all.sh                                        # Linux、macOS、Git Bash
+powershell -ExecutionPolicy Bypass -File demo\run_all.ps1 # Windows：Git Bash + 原生場景
+sh demo/scenarios/02_socks5_udp.sh                        # 運行單個場景
+```
+
+九個場景會啓動真實的服務端/客戶端/目標進程，逐步打印預期與實際（標籤爲 `预期` / `实际`）：SOCKS5 TCP 與
+UDP、HTTP 代理模式、轉發回退（camouflage）、TLS 驗證與熱重載、SSPanel 同步、`tunnel_path` 以及審計套件。
+輔助腳本需要 `python3`，`curl` 可選。前置條件、各場景細節與實測行爲見 [`demo/README.md`](demo/README.md)。
