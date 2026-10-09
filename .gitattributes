@@ -1,0 +1,5 @@
+# The demo scenarios are POSIX shell scripts and the Python helpers are executed directly: a CRLF
+# checkout would break them on Linux/macOS and in Git Bash (`set: -u\r: invalid option`). The TLS
+# fixtures are read as PEM by rustls, keep them deterministic as well.
+demo/** text eol=lf
+tests/fixtures/** text eol=lf
