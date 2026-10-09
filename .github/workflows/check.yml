@@ -39,6 +39,17 @@ jobs:
       - run: rustup component add clippy
       - run: cargo clippy --all --all-targets --all-features -- -D warnings
 
+  e2e:
+    name: E2E
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      # Runs the inline unit tests plus every tests/*.rs integration suite; the suites spawn the
+      # real overtls-bin and only use loopback sockets (`--test-threads=4` keeps the process count
+      # of the parallel test binaries small).
+      - run: cargo test -- --test-threads=4 --nocapture
+
   build:
     strategy:
       fail-fast: false
