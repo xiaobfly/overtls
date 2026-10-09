@@ -588,3 +588,41 @@ fn test_client_listen_url_deserialization() {
     config.set_listen_addr(listen_addr);
     assert_eq!(config.listen_addr().unwrap(), listen_addr);
 }
+
+/// SEC-07 (`ssr://` half): a node URL can carry `dangerous_mode=true`, and importing it silently
+/// disables certificate verification - a single link is enough.
+///
+/// Current behavior: the flag round-trips through `generate_ssr_url` / `from_ssr_url`. A fix must
+/// reject the import or require an explicit CLI override / confirmation - flip the assertion then.
+/// This test is fully offline: neither call touches DNS or TCP.
+#[test]
+fn ssr_url_imports_dangerous_mode() {
+    let client = Client {
+        server_host: "127.0.0.1".to_string(),
+        server_port: 443,
+        server_domain: Some("example.com".to_string()),
+        dangerous_mode: Some(true),
+        ..Client::default()
+    };
+
+    let config = Config {
+        remarks: Some("test".to_string()),
+        method: Some("none".to_string()),
+        password: Some("password".to_string()),
+        tunnel_path: TunnelPath::Single("/tunnel/".to_string()),
+        client: Some(client),
+        ..Config::default()
+    };
+
+    let url = config.generate_ssr_url().unwrap();
+    let payload = base64easy::decode(url.trim_start_matches("ssr://"), base64easy::EngineKind::UrlSafeNoPad).unwrap();
+    let payload = String::from_utf8(payload).unwrap();
+    assert!(payload.contains("dangerous_mode=true"), "the flag is carried by the URL: {payload}");
+
+    let round_trip = Config::from_ssr_url(&url).unwrap();
+    assert_eq!(
+        round_trip.client.unwrap().dangerous_mode,
+        Some(true),
+        "importing the URL silently enables dangerous mode: {payload}"
+    );
+}

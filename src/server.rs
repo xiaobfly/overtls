@@ -841,3 +841,50 @@ mod tls_reload_event_tests {
         assert!(event_affects_tls_files(&event, cert_path, key_path));
     }
 }
+
+#[cfg(test)]
+mod addr_is_private_tests {
+    use super::addr_is_private;
+    use std::net::SocketAddr;
+
+    fn addr(value: &str) -> SocketAddr {
+        value.parse().unwrap_or_else(|e| panic!("{value} is not a socket address: {e}"))
+    }
+
+    #[test]
+    fn flags_documented_private_forms() {
+        for value in [
+            // IPv4: loopback, RFC 1918, link-local and the benchmarking range.
+            "127.0.0.1:1",
+            "10.0.0.1:1",
+            "192.168.1.1:1",
+            "172.16.0.1:1",
+            "169.254.1.1:1",
+            "198.18.0.1:1",
+            // IPv6: loopback, link-local and unique local addresses.
+            "[::1]:1",
+            "[fe80::1]:1",
+            "[fc00::1]:1",
+        ] {
+            assert!(addr_is_private(&addr(value)), "{value} must be treated as private");
+        }
+    }
+
+    /// SEC-05 regressions: private-looking destinations that the current guard lets through.
+    /// These expectations document the *current* behaviour and must be flipped when the guard is
+    /// replaced by e.g. `IpAddr::is_global()`.
+    #[test]
+    fn misses_ipv4_mapped_and_special_ranges() {
+        for value in [
+            "[::ffff:127.0.0.1]:1", // IPv4-mapped loopback
+            "0.0.0.0:1",            // "this host"
+            "100.64.0.1:1",         // CGNAT (RFC 6598)
+            "192.0.0.1:1",          // documentation (RFC 5737)
+            "240.0.0.1:1",          // reserved (RFC 1112)
+            "[::]:1",               // unspecified
+            "[2001:db8::1]:1",      // documentation (RFC 3849)
+        ] {
+            assert!(!addr_is_private(&addr(value)), "{value} is currently not treated as private");
+        }
+    }
+}
